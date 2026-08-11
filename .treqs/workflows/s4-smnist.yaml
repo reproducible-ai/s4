@@ -50,9 +50,11 @@ setup:
     find / -xdev -name 'roar_inject.pth' 2>/dev/null || true
 
     # --- assert the identity of the published artifact, then install FROM THE INDEX ---
-    curl -sSL -o /tmp/roar_cli-0.4.4rc6.whl \
-      https://test-files.pythonhosted.org/packages/58/e9/04c6a8674eb29d065796060237ebfb07aa04567c45ce110b069c8a7dd2e1/roar_cli-0.4.4rc6-cp310-abi3-manylinux_2_34_x86_64.whl
-    echo "c7115b748886259b6a089e547404376acf84c3b81b4cbc8dc5610490ebea7199  /tmp/roar_cli-0.4.4rc6.whl" | sha256sum -c -
+    WHL=roar_cli-0.4.4rc6-cp310-abi3-manylinux_2_34_x86_64.whl   # keep the real
+    # wheel filename: pip rejects a renamed wheel ("Invalid wheel filename")
+    curl -sSL -o "/tmp/$WHL" \
+      "https://test-files.pythonhosted.org/packages/58/e9/04c6a8674eb29d065796060237ebfb07aa04567c45ce110b069c8a7dd2e1/$WHL"
+    echo "c7115b748886259b6a089e547404376acf84c3b81b4cbc8dc5610490ebea7199  /tmp/$WHL" | sha256sum -c -
     # `uv` is not guaranteed to be on this AMI's PATH (it was not, first attempt:
     # `/bin/bash: line 21: uv: command not found`), so fall back to a plain venv +
     # pip. Either way roar comes from the PUBLISHED TestPyPI index, under a 3.12
@@ -73,7 +75,7 @@ setup:
       # deps come from PyPI only, so no TestPyPI name can shadow them
       sudo /opt/roarenv/bin/python -m pip install --quiet \
           --index-url https://pypi.org/simple \
-          /tmp/roar_cli-0.4.4rc6.whl huggingface-hub
+          "/tmp/$WHL" huggingface-hub
       ROAR_BIN=/opt/roarenv/bin/roar
     fi
     echo "roar binary: $ROAR_BIN"
