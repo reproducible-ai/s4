@@ -133,3 +133,15 @@ outputs/*
 !outputs/.gitkeep
 data/*
 !data/.gitkeep
+# The published artifact lands in outputs/run/checkpoints/val/. Git cannot
+# re-include a file whose parent directory is excluded, so each level has to be
+# unignored explicitly for the tracked .gitkeep at the bottom to survive a clean
+# checkout -- without it roar reports "can't guarantee these paths exist on
+# reproduction".
+!outputs/run/
+outputs/run/*
+!outputs/run/checkpoints/
+outputs/run/checkpoints/*
+!outputs/run/checkpoints/val/
+outputs/run/checkpoints/val/*
+!outputs/run/checkpoints/val/.gitkeep

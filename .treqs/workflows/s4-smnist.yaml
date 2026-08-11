@@ -99,6 +99,25 @@ setup:
       echo "no local-version pins"
     fi
 
+    # --- Two host-inventory problems, both caused by the SAME mechanism.
+    # --- train.py imports pytorch-lightning 2.0.4, whose lightning_fabric calls
+    # --- pkg_resources.declare_namespace(); importing pkg_resources reads the
+    # --- METADATA of EVERY distribution installed on the host, so the tracer
+    # --- attributes the whole AMI inventory to this run rather than the recipe's
+    # --- import closure. Consequently:
+    # ---
+    # --- (a) the AMI's broken importlib-metadata install (present twice, as
+    # ---     `importlib-metadata 6.11.0` AND `importlib_metadata 8.0.0`) lands in
+    # ---     the freeze. Both spellings normalise to one project, so the pin set is
+    # ---     unsatisfiable and the row can never rebuild. Collapse it.
+    python -m repro.fix_dup_dists
+    # --- (b) the AMI's unrelated MLOps stack is recorded as if it were part of this
+    # ---     recipe. s4 has no mlflow integration of any kind (`grep -r mlflow src/`
+    # ---     is empty); a freeze claiming it is simply wrong, and a rebuild would
+    # ---     install it. Remove it, then prove the workload's imports still stand.
+    python -m pip uninstall -y --quiet mlflow mlflow-skinny mlflow-tracing         sagemaker-mlflow databricks-sdk || true
+    python -c "import torch, hydra, pytorch_lightning, wandb; print('post-uninstall imports OK')"
+
     # --- which native libs does the workload map, and does dpkg own them? ---
     # run as a module so the repo root (not repro/) is sys.path[0] and `src` imports;
     # a diagnostic must never be able to fail the run
