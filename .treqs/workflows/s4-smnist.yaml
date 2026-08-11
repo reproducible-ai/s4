@@ -30,8 +30,11 @@ secrets:
 setup:
   command: |
     set -eu
-    export PATH=/opt/pytorch/bin:$PATH
+    export PATH=/opt/pytorch/bin:$HOME/.local/bin:/root/.local/bin:/usr/local/bin:$PATH
     rm -rf *.egg-info src/*.egg-info
+    id -un; echo "HOME=$HOME"; echo "PATH=$PATH"
+    command -v python; python -V
+    command -v uv || echo "uv: NOT ON PATH"
 
     # --- purge any pre-existing roar (P0-7: a bare `roar` has been caught
     # --- importing a leftover package dir and reporting the wrong version) ---
@@ -49,11 +52,32 @@ setup:
     curl -sSL -o /tmp/roar_cli-0.4.4rc6.whl \
       https://test-files.pythonhosted.org/packages/58/e9/04c6a8674eb29d065796060237ebfb07aa04567c45ce110b069c8a7dd2e1/roar_cli-0.4.4rc6-cp310-abi3-manylinux_2_34_x86_64.whl
     echo "c7115b748886259b6a089e547404376acf84c3b81b4cbc8dc5610490ebea7199  /tmp/roar_cli-0.4.4rc6.whl" | sha256sum -c -
-    uv tool install --python 3.12 --force --with huggingface-hub \
-        --index-strategy unsafe-best-match \
-        --extra-index-url https://test.pypi.org/simple/ \
-        'roar-cli==0.4.4rc6'
-    sudo ln -sf /root/.local/bin/roar /usr/local/bin/roar
+    # `uv` is not guaranteed to be on this AMI's PATH (it was not, first attempt:
+    # `/bin/bash: line 21: uv: command not found`), so fall back to a plain venv +
+    # pip. Either way roar comes from the PUBLISHED TestPyPI index, under a 3.12
+    # interpreter that matches the workload's (P0-14), in its OWN environment so
+    # its dependency closure cannot leak into the recorded freeze.
+    if command -v uv >/dev/null 2>&1; then
+      uv tool install --python 3.12 --force --with huggingface-hub \
+          --index-strategy unsafe-best-match \
+          --extra-index-url https://test.pypi.org/simple/ \
+          'roar-cli==0.4.4rc6'
+      ROAR_BIN="$(ls -d "$HOME"/.local/bin/roar /root/.local/bin/roar 2>/dev/null | head -1)"
+    else
+      PY="$(command -v python)"
+      sudo rm -rf /opt/roarenv
+      sudo "$PY" -m venv /opt/roarenv
+      sudo /opt/roarenv/bin/python -m pip install --quiet --upgrade pip
+      # the sha256-verified artifact from the published index above; roar's own
+      # deps come from PyPI only, so no TestPyPI name can shadow them
+      sudo /opt/roarenv/bin/python -m pip install --quiet \
+          --index-url https://pypi.org/simple \
+          /tmp/roar_cli-0.4.4rc6.whl huggingface-hub
+      ROAR_BIN=/opt/roarenv/bin/roar
+    fi
+    echo "roar binary: $ROAR_BIN"
+    sudo ln -sf "$ROAR_BIN" /usr/local/bin/roar
+    hash -r
     test "$(roar --version | grep -o '[0-9][^ ]*$')" = "0.4.4rc6" || \
       { echo "WRONG ROAR: $(roar --version)"; exit 1; }
     test "$(ls $(dirname $(readlink -f $(command -v roar)))/../lib/python*/site-packages/roar/bin | wc -l)" -ge 6 || \
