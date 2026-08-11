@@ -100,7 +100,9 @@ setup:
     fi
 
     # --- which native libs does the workload map, and does dpkg own them? ---
-    python repro/native_libs.py
+    # run as a module so the repo root (not repro/) is sys.path[0] and `src` imports;
+    # a diagnostic must never be able to fail the run
+    python -m repro.native_libs || echo 'native-lib diagnostic FAILED (non-fatal)'
 
     roar tracer use preload
     roar tracer
