@@ -30,7 +30,8 @@ secrets:
 setup:
   command: |
     set -eu
-    export PATH=/opt/pytorch/bin:$HOME/.local/bin:/root/.local/bin:/usr/local/bin:$PATH
+    export HOME="${HOME:-/root}"
+    export PATH="/opt/pytorch/bin:$HOME/.local/bin:/root/.local/bin:/usr/local/bin:$PATH"
     rm -rf *.egg-info src/*.egg-info
     id -un; echo "HOME=$HOME"; echo "PATH=$PATH"
     command -v python; python -V
@@ -62,7 +63,7 @@ setup:
           --index-strategy unsafe-best-match \
           --extra-index-url https://test.pypi.org/simple/ \
           'roar-cli==0.4.4rc6'
-      ROAR_BIN="$(ls -d "$HOME"/.local/bin/roar /root/.local/bin/roar 2>/dev/null | head -1)"
+      ROAR_BIN="$(ls -d "$HOME"/.local/bin/roar /root/.local/bin/roar 2>/dev/null | head -1 || true)"
     else
       PY="$(command -v python)"
       sudo rm -rf /opt/roarenv
